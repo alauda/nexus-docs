@@ -1,0 +1,25 @@
+name: Reverse Sync on Push
+
+on:
+  push:
+    branches:
+      - main
+      - release-*
+
+# Limit token capabilities to what the job really needs
+permissions:
+  contents: read          # checkout / git diff
+  pull-requests: write    # create PR in target repo
+
+# (Optional) Prevent multiple syncs of the same ref running in parallel
+concurrency:
+  group: reverse-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reverse-sync:
+    uses: alaudadevops/run-actions/.github/workflows/reverse-sync-push.yml@main
+    with:
+      target_repo: alaudadevops/nexus-ce-operator
+    secrets:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
