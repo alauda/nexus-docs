@@ -1,0 +1,63 @@
+---
+weight: 10
+---
+
+# Introduction
+
+## Nexus Repository Manager Introduction
+
+Nexus Repository Manager is a repository management solution that enables your team to efficiently manage software components, dependencies, and artifacts throughout your software supply chain. As a central repository for binary components, Nexus Repository Manager provides a single source of truth for all your software artifacts, improving build reliability and accelerating development cycles.
+
+Nexus Repository Manager v3.76.0 is the latest Community Edition release, providing robust repository management capabilities with enhanced features and performance improvements. The Alauda Build of Nexus integrates this powerful tool into Kubernetes environments through a dedicated operator, simplifying deployment and management.
+
+## Nexus Repository Manager Advantages
+
+The core advantages of Nexus Repository Manager are as follows:
+
+- Universal Repository Support
+
+  Supports multiple repository formats including Maven, npm, Docker, PyPI, NuGet, Helm, and more, providing a unified solution for managing all types of software components.
+
+- Efficient Component Management
+
+  Reduces build times and network bandwidth usage by locally caching dependencies, eliminating redundant downloads and improving development efficiency.
+
+- Enhanced Security
+
+  Provides vulnerability scanning capabilities, component license analysis, and fine-grained access control to secure your software supply chain.
+
+- Scalable Architecture
+
+  Designed to handle enterprise-scale repository management needs with high performance and reliability.
+
+- Kubernetes Integration
+
+  The Alauda Build of Nexus provides seamless integration with Kubernetes environments through a dedicated operator, simplifying deployment and management.
+
+## Scenarios
+
+The main application scenarios of Nexus Repository Manager are as follows:
+
+- Software Development
+
+  Accelerates development cycles by providing local caching of dependencies and a central repository for sharing artifacts across development teams.
+
+- DevOps Pipelines
+
+  Integrates with CI/CD pipelines to provide reliable access to dependencies and a secure location for storing build outputs.
+
+- Artifact Distribution
+
+  Serves as a central distribution point for software artifacts, enabling controlled and secure sharing of components within an organization or with external partners.
+
+- Container Registry
+
+  Functions as a private Docker registry for storing and distributing container images, supporting modern containerized application development.
+
+## Limitations
+
+- Resource Requirements: Nexus Repository Manager requires sufficient CPU, memory, and storage resources, especially for production environments with high load.
+
+- Storage Scaling: As repositories grow, storage requirements increase. Plan for adequate storage capacity and consider implementing repository cleanup policies.
+
+- Backup Considerations: Regular backups of both the Nexus database and blob storage are essential for data protection.

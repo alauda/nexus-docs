@@ -1,0 +1,33 @@
+title: Alauda Build of Nexus
+logoText: Alauda Build of Nexus
+lang: en
+api:
+  crds:
+    - docs/shared/crds/*.yaml
+    - docs/shared/crds/*.yml
+  openapis:
+    - docs/shared/openapis/**/*.json
+    - docs/shared/openapis/**/*.yaml
+    - docs/shared/openapis/**/*.yml
+permission:
+  functionresources:
+    - docs/shared/functionresources/*.yaml
+  roletemplates:
+    - docs/shared/roletemplates/*.yaml
+
+releaseNotes:
+  queryTemplates:
+  ## TODO: change the versionMatch for the next releases
+    unfixed: | 
+      project = <%= project %> and affectedVersion in versionMatch("nexus-ce-operator-v3.76.[0-9]") and filter = 18959 AND ACPAffectVersions in (<%= acpversion %>) AND NOT (ACPFixVersions in (<%= acpversion %>) AND status in (Done, Resolved)) AND (labels not in (安全问题) OR labels is EMPTY) and ReleaseNotesStatus = Publish
+    fixed: | 
+      project = <%= project %> and affectedVersion in versionMatch("nexus-ce-operator-v3.76.[0-9]") and filter = 16502 AND (resolution not in ("By Design", "Not a Bug", Duplicate, Rejected, "Cannot Reproduce") OR resolution is EMPTY) AND (ACPFixVersions in (<%= acpversion %>) or fixVersion in versionMatch(<%= acpversion %>)) AND status in (Done, Resolved, 已完成) AND (affectedVersion in versionMatch("3.1[0-8]") OR ((issueFunction in linkedIssuesOf("affectedVersion in versionMatch('3.1[0-8]')", clones) OR issueFunction in linkedIssuesOf("affectedVersion in versionMatch('3.1[0-8]')", "is cloned by")))) and ReleaseNotesStatus = Publish
+
+translate:
+  userPrompt: |
+    - 以下术语请保持不要翻译
+      * ACP
+      * Alauda Build of Nexus
+      * Administrator
+      * Marketplace
+      * Operator Hub
