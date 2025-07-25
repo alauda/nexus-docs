@@ -1,0 +1,49 @@
+---
+title: Upgrading Nexus
+weight: 20
+---
+
+Upgrading Nexus is a relatively straightforward process, but the complexity can increase based on:
+
+You can read the [official upgrade documentation](https://help.sonatype.com/en/upgrade-nexus-repository.html) for more information.
+
+## Upgrade Path
+
+The table below contains the complete upgrade path. When upgrading, you need to upgrade the Operator and GitLab instance versions in sequence.
+
+| No  | Alauda Build of Nexus Operator Version |
+| --- | ---------------- |
+| 1   | 3.76.z          |
+| 2   | 3.81.z          |
+
+:::info
+In the version numbers above, the `.z` indicates the latest available patch version for that minor release.
+When performing an upgrade, you should always use the most recent patch version to ensure you benefit from the latest security updates and bug fixes.
+The latest patch versions for each release can be found in the [Release Notes](../overview/release_notes.mdx).
+:::
+
+:::warning
+If your Nexus version is lower than `3.76.0`, please refer to the [Nexus Migration Guide: 3.69.0 to 3.76.0](./migrate_to_3.76.0.md) to complete the upgrade.
+:::
+
+## Upgrade Steps
+
+:::warning
+To safely upgrade your Nexus version to a new version, please note the following:
+
+1. Before upgrading the Nexus instance, please complete the data backup of the instance.
+2. Upgrading Nexus takes some time, depending on the Nexus data size and the version gap between the current version and target version (number of upgrades)
+3. The instance will be unavailable during the upgrade process.
+:::
+
+When upgrading, you need to upgrade the <ExternalSiteLink name="acp" href="extend/operator.html#upgrading-operators" children="Operator" /> version and instance version in sequence according to the upgrade path. Upgrading the Operator will not automatically upgrade the instance version, and the upgraded Operator will not manage old Nexus instances, so you need to manually trigger the instance upgrade in time.
+
+## Upgrading Instances
+
+### Upgrading Instances via UI
+
+Go to the `Administrator` -> `Marketplace` -> `Operator Hub` page, switch to the target cluster and enter the `Alauda Build of Nexus` Operator details page, click on the instance name you want to upgrade to enter the instance details page, and click the upgrade button on the instance details page.
+
+### Upgrading Instances via YAML
+
+Go to the `Administrator` -> `Clusters` -> `Resources` page, switch to the target cluster and search for the `Nexus` resource type, edit the instance resource you want to upgrade, modify the `spec.version` field to the desired instance version, and save it.
