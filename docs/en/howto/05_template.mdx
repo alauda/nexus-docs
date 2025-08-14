@@ -11,7 +11,7 @@ The custom template process is as follows:
 1. Configure the template: According to the explanation in the [Configure Template](#config_template) section, configure the content of the template as needed
 2. Register and verify the template: According to the explanation in the [Register and Verify the Template](#register_template) section, register the template in the target cluster and verify the template content
 
-## <span id ="config_template">Configure Template</span>
+## Configure Template \{#config_template}
 
 ### Template Structure
 
@@ -20,6 +20,8 @@ The tool deployment template is defined and managed through the ConfigMap resour
 1. Basic information: Contains basic configuration information such as the name, description, and tags of the template
 2. UI dynamic form: Defines the form items that the user needs to fill in when deploying the tool
 3. Deployment template: Contains the specific resource definitions required for tool deployment
+
+{/* lint ignore code-block-split-list */}
 
 ```yaml
 apiVersion: v1
