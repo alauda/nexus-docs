@@ -1,4 +1,4 @@
-# Nexus Migration Guide: 3.69.0 to 3.76.0
+# Nexus Migration Guide: 3.69.0 to 3.76.0 (Alauda Build of Nexus Operator Version v3.76.z)
 
 ## Overview
 
@@ -163,9 +163,9 @@ Then restart the Nexus Pod.
 
 1. Verify pod status:
 
-```bash
-kubectl -n ${INSTANCE_NAMESPACE} get pods -l app.kubernetes.io/instance=${INSTANCE_NAME}
-```
+    ```bash
+    kubectl -n ${INSTANCE_NAMESPACE} get pods -l app.kubernetes.io/instance=${INSTANCE_NAME}
+    ```
 
 2. Validation checklist:
    - [ ] Web UI accessibility
