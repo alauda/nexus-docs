@@ -1,8 +1,14 @@
-# Nexus Migration Guide: 3.69.0 to 3.76.0
+# Nexus Migration Guide: 3.69.0 to 3.76.0 (Alauda Build of Nexus Operator Version v3.76.z)
 
 ## Overview
 
 This document provides detailed instructions for migrating Nexus Repository Manager from version 3.69.0 to 3.76.0. Due to Nexus discontinuing OrientDB support after version 3.70, a manual data migration process is required.
+
+## Prerequisites
+
+- [Install Alauda Build of Nexus Operator v3.76.z version](../install/01_installation_guide.mdx)
+- Ensure sufficient system resources are available for the upgrade
+- Use product functionality to upgrade Nexus to version 3.69.0
 
 ## Migration Process
 
@@ -163,9 +169,9 @@ Then restart the Nexus Pod.
 
 1. Verify pod status:
 
-```bash
-kubectl -n ${INSTANCE_NAMESPACE} get pods -l app.kubernetes.io/instance=${INSTANCE_NAME}
-```
+    ```bash
+    kubectl -n ${INSTANCE_NAMESPACE} get pods -l app.kubernetes.io/instance=${INSTANCE_NAME}
+    ```
 
 2. Validation checklist:
    - [ ] Web UI accessibility
