@@ -14,7 +14,7 @@ This document provides detailed instructions for migrating Nexus Repository Mana
 
 ### 1. Data Backup
 
-Create backup directory:
+Create backup directory (ensure sufficient local disk space for backup):
 
 ```bash
 mkdir -p nexus-backup
@@ -29,6 +29,8 @@ export POD_NAME=$(kubectl -n ${INSTANCE_NAMESPACE} get pod -l release=${INSTANCE
 ```
 
 #### 1.1 Service Shutdown
+
+Before deletion, you must uninstall the old version operator first, otherwise the service will be automatically recreated after deletion.
 
 ```bash
 kubectl -n ${INSTANCE_NAMESPACE} delete service -l release=${INSTANCE_NAME}
@@ -47,7 +49,7 @@ kubectl -n ${INSTANCE_NAMESPACE} cp ${POD_NAME}:/nexus-data/blobs nexus-backup/b
 2. Create new task:
    - Type: Admin - Export databases for backup
    - Task name: [Your choice]
-   - Backup location: [Specify path]
+   - Backup location: [Specify path] - The directory path must be within the Nexus data volume directory.
    - Frequency: Manual
 3. Execute task and verify completion status
 
@@ -58,8 +60,8 @@ kubectl -n ${INSTANCE_NAMESPACE} cp ${POD_NAME}:/nexus-data/blobs nexus-backup/b
 Set environment variables:
 
 ```bash
-export INSTANCE_NAME=<nexus instance name> 
-export INSTANCE_NAMESPACE=<nexus instance namespace>
+export INSTANCE_NAME=<old nexus instance name> 
+export INSTANCE_NAMESPACE=<old nexus instance namespace>
 export POD_NAME=$(kubectl -n ${INSTANCE_NAMESPACE} get pod -l release=${INSTANCE_NAME} | grep ${INSTANCE_NAME} | awk '{print $1}')
 ```
 
@@ -71,7 +73,7 @@ cd /nexus-data/backup
 wget https://download.sonatype.com/nexus/nxrm3-migrator/nexus-db-migrator-3.70.3-01.jar -O nexus-db-migrator.jar
 ```
 
-Alternative download method:
+If direct network download is not available, you can download the file locally first and then copy it to the container:
 
 ```bash
 kubectl -n ${INSTANCE_NAMESPACE} cp nexus-db-migrator.jar ${POD_NAME}:/nexus-data/backup
@@ -84,7 +86,6 @@ Execute migration:
 java -Xmx16G -Xms16G -XX:+UseG1GC -XX:MaxDirectMemorySize=28672M -jar nexus-db-migrator.jar --migration_type=h2
 ```
 
-
 Backup converted database:
 
 ```bash
@@ -94,6 +95,8 @@ kubectl -n ${INSTANCE_NAMESPACE} cp ${POD_NAME}:/nexus-data/backup/nexus.mv.db n
 ### 3. New Instance Deployment
 
 Since data and storage are imported from the original instance, when deploying the new instance, you only need to maintain the same access method as the original instance.
+
+**Note:** Using the same NodePort and Ingress configuration as the old version will cause conflicts and prevent creation. Configure new values instead, and after successful migration, delete the old version instance and then modify the external exposure settings.
 
 #### 3.1 Configuration Options
 
@@ -150,7 +153,7 @@ export INSTANCE_NAMESPACE=<new nexus instance namespace>
 export POD_NAME=$(kubectl -n ${INSTANCE_NAMESPACE} get pod -l app.kubernetes.io/instance=${INSTANCE_NAME} | grep ${INSTANCE_NAME} | awk '{print $1}')
 ```
 
-Clear existing data:
+Clear existing data (skip this step if the new data volume is empty):
 
 ```bash
 kubectl -n ${INSTANCE_NAMESPACE} exec -it ${POD_NAME} -- rm -rf /nexus-data/blobs /nexus-data/db/nexus.mv.db 
@@ -182,5 +185,5 @@ Then restart the Nexus Pod.
    - [ ] Repository permissions
 
 3. Post-migration cleanup:
-   - Remove old instance after successful verification
+   - Remove old instance after successful verification (requires reinstalling the old version operator to complete old instance resource cleanup)
    - Archive backups according to retention policy
