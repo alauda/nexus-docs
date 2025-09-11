@@ -1,0 +1,191 @@
+---
+title: "How to configure PyPI package management using Nexus Repository"
+description: "How to use Nexus Group to unify PyPI package management, combining private package hosting and public package proxying for an efficient Python package management solution."
+weight: 130
+---
+
+## Overview
+
+The Python Package Index, or PyPI, is a vast repository of open-source Python packages supplied by the worldwide community of Python developers. The official index is available at https://pypi.org, and the site itself is maintained by the Python Software Foundation.
+
+Nexus Repository supports proxying the Python Package Index. This takes advantage of the packages in the official Python Package Index without incurring repeated downloads to reduce time and bandwidth usage for accessing Python packages.
+
+Also, you can publish your packages to a private index as a hosted repository, and expose the remote and private repositories as a repository group that merges and exposes the contents of multiple repositories in one convenient URL.
+
+### Repository Types Overview
+
+**PyPI Proxy** - Acts as a proxy to remote PyPI repositories (like https://pypi.org), caching packages locally for faster access and reduced bandwidth usage. When a package is requested, it first checks the local cache, and if not found, downloads from the remote repository and caches it locally.
+
+**PyPI Hosted** - Stores packages that are uploaded directly to your Nexus instance. This is typically used for private packages, internal libraries, or packages that you want to maintain full control over.
+
+**PyPI Group** - Combines multiple PyPI repositories (proxy, hosted, or other groups) into a single logical repository. When a package is requested from a group, Nexus searches through the member repositories in a specified order until the package is found. **Note**: the PyPI Group repository is only used to downloaded PyPI packages, not to deploy PyPI packages.
+
+### Typical Architecture
+
+A common setup includes:
+1. **PyPI Hosted** - For private/internal packages
+2. **PyPI Proxy** - For caching public packages from PyPI.org
+3. **PyPI Group** - Combines both hosted and proxy repositories, providing a unified access point
+
+This architecture allows clients to use a single repository URL while accessing both private and public packages seamlessly.
+
+## Prerequisites
+
+- Nexus instance has been deployed and you have logged in with admin credentials.
+- Python environment is installed locally with pip package manager available.
+
+## Create PyPI Proxy Repository
+
+If you want to use PyPI Proxy to cache the PyPI packages, you need to create a PyPI Proxy repository. **Note**: the nexus instance should be accessible from the internet.
+
+Navigate to the Nexus interface and follow these steps:
+1. Click `Settings` → `Repositories` → `Create repository` → `PyPI (proxy)`
+2. Fill in the configuration details and click `Create repository`
+
+**Configuration Parameters:**
+- **Name**: Enter a repository name, e.g., `pypi-proxy`
+- **Remote storage**: Enter the remote repository URL, e.g., `https://pypi.org`
+- **Storage**: Select the appropriate storage type based on your requirements
+
+## Create PyPI Hosted Repository
+
+If you want to use PyPI Hosted to store the PyPI packages, you need to create a PyPI Hosted repository.
+
+Navigate to the Nexus interface and follow these steps:
+1. Click `Settings` → `Repositories` → `Create repository` → `PyPI (hosted)`
+2. Fill in the configuration details and click `Create repository`
+
+**Configuration Parameters:**
+- **Name**: Enter a repository name, e.g., `pypi-hosted`
+- **Storage**: Select the appropriate storage type based on your requirements
+- **Deployment policy**: Choose `Allow redeploy` or `Disable redeploy` based on your needs
+
+## Create PyPI Group Repository
+
+Navigate to the Nexus interface and follow these steps:
+1. Click `Settings` → `Repositories` → `Create repository` → `PyPI (group)`
+2. Fill in the configuration details and click `Create repository`
+
+**Configuration Parameters:**
+- **Name**: Enter a repository name, e.g., `pypi-group`
+- **Member repositories**: Select the previously created `pypi-proxy` and `pypi-hosted` repositories, m
+- **Order**: Configure the search order of repositories based on your requirements
+
+## Using Nexus repository with Python client
+
+Before proceeding with the following scenarios, you can obtain the repository URL from the Nexus web interface. Click `Browse`, select the previously created repository, and click the `Copy` button to get the repository URL. This URL will be used in the configuration examples below.
+
+### Scenario 1: Upload to a hosted repository using twine
+
+This scenario demonstrates how to use the PyPI Hosted repository to deploy and publish your own Python packages to Nexus. This is particularly useful for:
+
+- **Private packages**: Internal libraries and applications that should not be published to public PyPI
+- **Custom builds**: Modified versions of public packages with your specific configurations
+- **Proprietary software**: Commercial or confidential packages that require controlled distribution
+- **Development packages**: Pre-release versions for internal testing and validation
+
+The process involves building your Python package, configuring the deployment target, and uploading the package to your Nexus PyPI Hosted repository.
+
+```bash
+# Install the latest version of PyPA's build and twine tools
+$ python3 -m pip install --upgrade build twine
+
+# Clone the sample project, you can also use your own project
+$ git clone https://github.com/pypa/sampleproject.git
+$ cd sampleproject
+# Build the package
+$ python3 -m build
+....
+adding 'test_pypi_demo_mac_2025-0.1.0.dist-info/RECORD'
+removing build/bdist.macosx-10.13-universal2/wheel
+Successfully built test_pypi_demo_mac_2025-0.1.0.tar.gz and test_pypi_demo_mac_2025-0.1.0-py3-none-any.whl
+
+# Add the PyPI Hosted repository URL to your user-level configuration, more information please refer to [PyPI Configuration](https://packaging.python.org/en/latest/specifications/pypirc/#pypirc)
+# The distutils section defines an index-servers field that lists the name of all sections describing a repository.
+$ cat <<EOF > ~/.pypirc
+[distutils]
+index-servers = nexus
+
+[nexus]
+repository = https://your-nexus-server.com/repository/pypi-hosted/
+username = username
+password = password
+EOF
+
+# Deliver PyPI packages
+$ python3 -m twine upload --repository nexus dist/*
+Uploading distributions to http://your-nexus-server.com/repository/pypi-host/
+Uploading test_pypi_demo_mac_2025-0.1.0-py3-none-any.whl
+100% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.9/12.9 kB • 00:00 • ?
+Uploading test_pypi_demo_mac_2025-0.1.0.tar.gz
+100% ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 13.9/13.9 kB • 00:00 • ?
+```
+
+After successfully uploading packages to the PyPI Hosted repository, you can view and manage them through the Nexus web interface: `Browse` → `Select PyPI Hosted Repository` → `Browse Package Contents`
+
+
+### Scenario 2: Download and install packages using pip for a PyPI Group repository
+
+This scenario demonstrates how to configure pip to use a PyPI Group repository for managing Python package dependencies. This is particularly useful for:
+
+- **Unified package access**: Use a single repository URL to access both public packages (via proxy) and private packages (via hosted)
+- **Performance optimization**: Local caching of frequently used packages reduces download times and bandwidth usage
+- **Centralized management**: All package dependencies are managed through a single Nexus instance
+- **Security control**: Centralized authentication and access control for package downloads
+
+The process involves configuring pip to use the PyPI Group repository URL, which automatically searches through member repositories to find and download the required packages.
+
+
+#### Configure pip for Anonymous Access
+
+```bash
+# Add the PyPI Group repository URL to your user-level configuration
+# if the Nexus server does not have valid or any HTTPS certificate, you can add the trusted-host parameter
+$ mkdir -p ~/.pip
+$ cat <<EOF > ~/.pip/pip.conf
+[global]
+index-url = https://your-nexus-server.com/repository/pypi-group/simple/
+timeout = 15
+
+[install]
+trusted-host = your-nexus-server.com 
+EOF
+
+# Install PyPI packages
+$ pip3 install requests
+Looking in indexes: https://your-nexus-server.com/repository/python/simple/
+...
+Requirement already satisfied: certifi>=2017.4.17 in /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (from requests) (2025.8.3)
+```
+
+#### Configure pip for Authenticated Access
+
+If Nexus has disabled anonymous access, you need to add username and password to the pip.conf file:
+
+```bash
+# Add the PyPI Group repository URL to your user-level configuration
+# if the Nexus server does not have valid or any HTTPS certificate, you can add the trusted-host parameter
+$ mkdir -p ~/.pip
+$ cat <<EOF > ~/.pip/pip.conf
+[global]
+index-url = https://username:password@your-nexus-server.com/repository/pypi-group/simple/
+timeout = 15
+
+[install]
+trusted-host = your-nexus-server.com
+EOF
+
+# Install PyPI packages
+$ pip3 install requests
+Looking in indexes: https://admin:****@your-nexus-server.com/repository/python/simple/
+...
+Requirement already satisfied: certifi>=2017.4.17 in /Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (from requests) (2025.8.3)
+```
+
+#### Configuration Notes
+
+- Special characters in passwords must be URL-encoded (e.g. `@` becomes `%40`)
+- Consider security implications of storing credentials in plain text
+- Always append `/simple/` to the repository URL
+- If Nexus uses an insecure connection or untrusted certificate, configure the `trusted-host` parameter
+
