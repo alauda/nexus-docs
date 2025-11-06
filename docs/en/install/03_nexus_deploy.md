@@ -63,7 +63,7 @@ spec:
 
 For more information, refer to [Resource description in SonarQube Chart](https://github.com/sonatype/nxrm3-ha-repository/blob/76.0.0/nxrm-ha/values.yaml#L95)
 
-#### Network Configuration
+#### Network Configuration \{#network-configuration}
 
 Network configurations are categorized into two types:
 
@@ -100,7 +100,7 @@ spec:
         nodePort: 30100
 ```
 
-#### Storage Configuration
+#### Storage Configuration \{#storage-configuration}
 
 Storage configurations are mainly divided into three categories:
 
