@@ -1,0 +1,300 @@
+---
+title: "How to backup and restore nexus with Nexus"
+description: "This guide explains how to back up and restore your Nexus repository data using Nexus's built-in backup and restore features."
+weight: 130
+---
+
+## Prerequisites
+
+Uninstall the Nexus operator from the cluster.
+
+```bash
+kubectl get subscription --all-namespaces | grep nexus-ce-operator | awk '{print "kubectl delete subscription "$2" -n "$1}' | sh
+
+# Output:
+# subscription.operators.coreos.com "nexus-ce-operator" deleted
+```
+
+::: details Why uninstall the Nexus operator?
+
+During backup and restore, the Operator may reconcile Nexus resources and interfere with the process. If the Operator is not uninstalled, the following issues may occur:
+
+1. The Operator may recreate or restart workloads based on the Nexus CR, interrupting the backup/restore procedure and potentially causing data inconsistency.
+2. Some resources you temporarily remove (e.g., `Service`) might be recreated, or conflict with resources restored from backup (e.g., `Ingress`).
+
+:::
+
+::: details Impact of uninstalling the Nexus operator
+
+After uninstalling the Operator, modifications to the Nexus CR will not take effect, such as adjusting resources or storage size.
+
+Uninstalling the Operator will not cause existing instances to malfunction.
+
+:::
+
+## Backup
+
+Backup consists of four steps:
+
+1. Create a backup task on Nexus web.
+2. Remove the nexus instance service to prevent data changes
+3. Backup nexus data and verify the backup.
+4. Restore nexus instance after the backup end.
+
+### Create a backup task on Nexus web.
+
+Login to Nexus web UI as an admin user. Navigate to `Settings` -> `System` -> `Tasks` -> `Create task` -> Select `Admin - Backup H2 Database`, input:
+
+- Task enabled: true
+- Task name: nexus-backup (or any name you like)
+- Notification email: (optional) user@example.com
+- Send Notification on: (optional) Failure
+- Location: any subdirectory under `/nexus-data` (e.g., `/nexus-data/backup-dir`)
+- Task frequency: Manual
+
+### Remove the nexus instance service to prevent data changes during backup
+
+To prevent writes during backup, temporarily stop the service endpoint to the instance by deleting the `Service` that fronts the pod(s):
+
+```bash
+export NEXUS_NAMESPACE=<namespace of the NEXUS instance to be backed up>
+export NEXUS_NAME=<name of the NEXUS instance to be backed up>
+export NEXUS_BACKUP_DIR=<the backup task location you set in the previous step>
+export POD_NAME=$(kubectl -n ${NEXUS_NAMESPACE} get pod ${NEXUS_NAME}-nxrm-ha-0 -o jsonpath='{.metadata.name}')
+
+kubectl delete service -l release=${NEXUS_NAME} -n ${NEXUS_NAMESPACE}
+
+#output:
+# service "nexus-nxrm-ha" deleted
+# service "nexus-nxrm-ha-hl" deleted
+```
+
+This does not delete the pod or data; it only stops external traffic.
+
+### Backup nexus data and verify the backup
+
+#### Backup blob storage
+
+```bash
+mkdir -p nexus-backup/blobs
+kubectl -n ${NEXUS_NAMESPACE} cp ${POD_NAME}:/nexus-data/blobs nexus-backup/blobs
+```
+
+#### Backup node ID keystore
+
+```bash
+mkdir -p nexus-backup/node
+kubectl -n $NEXUS_NAMESPACE cp ${POD_NAME}:/nexus-data/keystores/node nexus-backup/node
+```
+
+#### Export and back up the database
+
+```bash
+export NEXUS_ADMIN_USER=admin
+export NEXUS_ADMIN_PASSWORD=<admin-password>
+
+kubectl exec -ti $POD_NAME -n $NEXUS_NAMESPACE -- curl -u $NEXUS_ADMIN_USER:$NEXUS_ADMIN_PASSWORD 'localhost:8081/service/rest/v1/tasks?type=h2.backup.task'
+
+# output:
+#{
+#  "items" : [ {
+#    "id" : "b379f8cb-ea52-4bae-9eed-84aed7686a63",
+#    "name" : "nexus-backup",
+#    "type" : "h2.backup.task",
+#    "message" : null,
+#    "currentState" : "WAITING",
+#    "lastRunResult" : null,
+#    "nextRun" : null,
+#    "lastRun" : null
+#  } ],
+#  "continuationToken" : null
+#}
+
+export TASK_ID=b379f8cb-ea52-4bae-9eed-84aed7686a63 # replace with your task id from above output
+kubectl exec -ti $POD_NAME -n $NEXUS_NAMESPACE -- curl -s -o /dev/null -w "%{http_code}\n" -u $NEXUS_ADMIN_USER:$NEXUS_ADMIN_PASSWORD -X POST localhost:8081/service/rest/v1/tasks/${TASK_ID}/run
+
+# Code	Description
+# 204	Task was run
+# 404	Task not found
+# 405	Task is disabled
+# output:
+# 204
+
+kubectl exec -ti $POD_NAME -n $NEXUS_NAMESPACE -- curl -u $NEXUS_ADMIN_USER:$NEXUS_ADMIN_PASSWORD localhost:8081/service/rest/v1/tasks/${TASK_ID}
+
+#output(lastRun and lastRunResult will vary):
+# {
+#   "id" : "b379f8cb-ea52-4bae-9eed-84aed7686a63",
+#   "name" : "nexus-backup",
+#   "type" : "h2.backup.task",
+#   "message" : "Backup embedded h2 database to the specified location",
+#   "currentState" : "WAITING",
+#   "lastRunResult" : "OK",
+#   "nextRun" : null,
+#   "lastRun" : "2025-11-03T15:21:50.302+00:00"
+# }
+
+kubectl exec -ti $POD_NAME -n $NEXUS_NAMESPACE -- ls $NEXUS_BACKUP_DIR
+
+# output:
+# nexus-2025-11-03-15-12-34.zip
+```
+
+Then copy the exported files from the pod:
+
+```bash
+mkdir -p nexus-backup/restore-from-backup
+kubectl -n $NEXUS_NAMESPACE cp ${POD_NAME}:$NEXUS_BACKUP_DIR nexus-backup/restore-from-backup
+```
+
+#### Verify backup contents
+
+After completing the copy, the backup directory should contain at least the following folders:
+
+- `nexus-backup/blobs`
+- `nexus-backup/node`
+- `nexus-backup/restore-from-backup`
+
+You may see different file names inside these directories depending on your instance.
+
+```bash
+nexus-backup
+├── blobs
+│   └── default
+│       ├── content
+...
+├── node
+│   ├── private.ks
+│   └── trusted.ks
+└── restore-from-backup
+    └── nexus-2025-11-03-15-12-04.zip
+```
+
+### After Successful Backup, Restore the nexus instance service
+
+Go to the `Administrator` -> `Marketplace` -> `Operator Hub` page, switch to the target cluster, and then redeploy the `Alauda Build of Nexus` Operator.
+
+## Restore
+
+### Prerequisites
+
+Decide the target namespace and whether you will restore into the original instance (overwriting data) or into a new instance. Ensure the Operator remains uninstalled during the restore to avoid interference.
+
+Restoration consists of five steps:
+
+1. Uninstall Nexus ce operator from the cluster if not done already.
+2. Remove the nexus instance service to prevent data changes during restore.
+3. Remove existing data from the target instance.
+4. Restart the pod to let Nexus restore from backup.
+5. Clean up temporary data and restore normal service.
+
+### Uninstall Nexus ce operator from the cluster if not done already.
+
+```bash
+kubectl get subscription --all-namespaces | grep nexus-ce-operator | awk '{print "kubectl delete subscription "$2" -n "$1}' | sh
+
+# Output:
+# subscription.operators.coreos.com "nexus-ce-operator" deleted
+```
+
+### Remove the nexus instance service to prevent data changes during restore
+
+```bash
+export NEXUS_NAMESPACE=<namespace of the NEXUS instance to be restore>
+export NEXUS_NAME=<name of the NEXUS instance to be restore up>
+export POD_NAME=$(kubectl -n ${NEXUS_NAMESPACE} get pod ${NEXUS_NAME}-nxrm-ha-0 -o jsonpath='{.metadata.name}')
+
+kubectl delete service -n $NEXUS_NAMESPACE -l release=$NEXUS_NAME
+
+# output:
+# service "kychen-nxrm-ha" deleted
+# service "kychen-nxrm-ha-hl" deleted
+```
+
+### Remove existing data from the target instance
+
+Delete the existing data from the target pod to avoid mixing old and restored data. If permissions prevent deletion inside the pod, remove the data directly from the mounted volume according to your storage class instructions.
+
+```bash
+kubectl -n $NEXUS_NAMESPACE exec -it ${POD_NAME} -- \
+  rm -rf /nexus-data/blobs \
+         /nexus-data/keystores/node \
+         /nexus-data/db/
+```
+
+If you must delete on the node/PV directly, remove the same directories there.
+
+### Restart the pod to let Nexus restore from backup.
+
+#### Import backup data
+
+```bash
+kubectl -n $NEXUS_NAMESPACE cp nexus-backup/blobs ${POD_NAME}:/nexus-data
+kubectl -n $NEXUS_NAMESPACE cp nexus-backup/node ${POD_NAME}:/nexus-data/keystores
+unzip nexus-backup/restore-from-backup/nexus-*.zip -d /tmp/nexus-restore
+kubectl -n $NEXUS_NAMESPACE cp /tmp/nexus-restore ${POD_NAME}:/nexus-data/db
+```
+
+Verify the following directories in the pod contain data:
+
+- `/nexus-data/blobs`
+- `/nexus-data/keystores/node`
+- `/nexus-data/restore-from-backup`
+
+#### Restart pod to restore
+
+```bash
+kubectl -n $NEXUS_NAMESPACE delete pod ${POD_NAME}
+```
+
+Wait for the new pod to start and for Nexus to complete its internal restore process.
+
+### Clean up temporary data and restore normal service.
+
+After confirming data has been restored and the instance works as expected, remove the temporary restore files to avoid repeated imports on future restarts:
+
+```bash
+kubectl -n $NEXUS_NAMESPACE exec -it ${POD_NAME} -- rm -rf /nexus-data/restore-from-backup
+```
+
+Go to the `Administrator` -> `Marketplace` -> `Operator Hub` page, switch to the target cluster, and then redeploy the `Alauda Build of Nexus` Operator.
+
+Login in Nexus Web, check that all repositories and data are intact.
+
+
+## Troubleshooting
+
+### Backup task fails with AccessDeniedException
+
+when checking the task status, if you see the lastRunResult is FAILED:
+
+```bash
+kubectl exec -ti $POD_NAME -n $NEXUS_NAMESPACE -- curl -u $NEXUS_ADMIN_USER:$NEXUS_ADMIN_PASSWORD localhost:8081/service/rest/v1/tasks/${TASK_ID}
+Defaulted container "nxrm-app" out of: nxrm-app, request-log, audit-log, tasks-log, chown-nexusdata-owner-to-nexus-and-init-log-dir (init)
+{
+  "id" : "0a8a4597-1cee-4f4c-8d86-6d81eb2cd8eb",
+  "name" : "nexus-backup",
+  "type" : "h2.backup.task",
+  "message" : "Backup embedded h2 database to the specified location",
+  "currentState" : "WAITING",
+  "lastRunResult" : "FAILED",
+  "nextRun" : null,
+  "lastRun" : "2025-11-05T06:23:31.010+00:00"
+}
+```
+
+you can check the task log for more details:
+
+```bash
+kubectl logs $POD_NAME -n $NEXUS_NAMESPACE | grep $TASK_ID -A 10 -B 10
+Defaulted container "nxrm-app" out of: nxrm-app, request-log, audit-log, tasks-log, chown-nexusdata-owner-to-nexus-and-init-log-dir (init)
+2025-11-05 06:23:31,023+0000 INFO  [quartz-8-thread-20] *TASK org.sonatype.nexus.internal.datastore.task.H2BackupTask - Task configuration: {.name=nexus-backup, .id=0a8a4597-1cee-4f4c-8d86-6d81eb2cd8eb, .typeName=Admin - Backup H2 Database, .visible=true, .typeId=h2.backup.task, .notificationCondition=FAILURE, .updated=2025-11-05T06:19:54.814Z, .recoverable=false, .enabled=true, .message=Backup embedded h2 database to the specified location, location=/nexus/backup, .exposed=true, .created=2025-11-05T06:19:54.814Z}
+2025-11-05 06:23:31,023+0000 INFO  [quartz-8-thread-20] *TASK org.sonatype.nexus.internal.datastore.task.H2BackupTask - Task log: /opt/sonatype/sonatype-work/nexus3/log/tasks/allTasks.log
+2025-11-05 06:23:31,024+0000 ERROR [quartz-8-thread-20] *TASK org.sonatype.nexus.bootstrap.entrypoint.configuration.ApplicationDirectoriesImpl - Failed to create directory: /nexus/backup
+2025-11-05 06:23:31,031+0000 WARN  [quartz-8-thread-20] *TASK org.sonatype.nexus.quartz.internal.task.QuartzTaskJob - Task 0a8a4597-1cee-4f4c-8d86-6d81eb2cd8eb : 'nexus-backup' [h2.backup.task] execution failure
+java.lang.RuntimeException: java.nio.file.AccessDeniedException: /nexus
+```
+
+This indicates that Nexus does not have permission to write to the specified backup location. Ensure that the backup directory under `/nexus-data`.
+
+Go to the `Administrator` -> `Marketplace` -> `Operator Hub` page, switch to the target cluster, and then redeploy the `Alauda Build of Nexus` Operator, and Navigate to nexus web, modify the backup task to use a directory under `/nexus-data`, such as `/nexus-data/backup`.
