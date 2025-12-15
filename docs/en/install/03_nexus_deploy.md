@@ -6,6 +6,15 @@ weight: 200
 
 This document describes the subscription of Nexus Operator and the functionality for deploying Nexus instances.
 
+::: danger Namespace Security Policy Restrictions
+
+Nexus **does not support** deployment in namespaces with SPA (Security Policy Admission) policy set to `Restricted` due to the following reasons:
+
+1. **Init Container Requires Root Privileges**: Nexus uses init containers to initialize PVC directory permissions, which requires root privileges that are not allowed under the Restricted policy.
+
+**Recommendation**: Create a dedicated namespace for the Nexus deployment and ensure that its security policy is **not** set to `Restricted`. When deploying Nexus with `hostPath` storage, the namespace security policy **must be configured as `Privileged`**.
+:::
+
 ## Prerequisites
 
 - This document applies to Nexus 3.76 and above versions provided by the platform. It is decoupled from the platform based on technologies such as Operator.
@@ -63,7 +72,7 @@ spec:
 
 For more information, refer to [Resource description in SonarQube Chart](https://github.com/sonatype/nxrm3-ha-repository/blob/76.0.0/nxrm-ha/values.yaml#L95)
 
-#### Network Configuration
+#### Network Configuration \{#network-configuration}
 
 Network configurations are categorized into two types:
 
@@ -100,7 +109,7 @@ spec:
         nodePort: 30100
 ```
 
-#### Storage Configuration
+#### Storage Configuration \{#storage-configuration}
 
 Storage configurations are mainly divided into three categories:
 
@@ -220,14 +229,3 @@ spec:
         nodePort: 30100
     hostPath: /tmp/nexus
 ```
-
-## Additional Information
-
-### Pod Security Policy
-
-When deploying Nexus in a namespace with Pod Security Policy (PSP) enabled, the following deployment configurations are supported:
-
-- **StorageClass and PVC-based Storage**: Compatible with both `privileged` and `baseline` enforcement modes
-- **Node Storage**: Requires `privileged` enforcement mode due to direct host filesystem access requirements
-
-Note: It is recommended to use StorageClass or PVC-based storage in production environments to ensure better security and compliance with Kubernetes security best practices.
