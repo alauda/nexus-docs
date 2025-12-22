@@ -1,0 +1,150 @@
+---
+title: "Rollback to Nexus 3.76"
+description: ""
+weight: 130
+---
+
+::: danger Deprecated: Nexus 3.81 (nexus-ce-operator v3.81.1 and v3.81.2)
+
+Due to restrictive limitations in Nexus 3.81 Community Edition, **this version has been discontinued**. Once usage reaches the quota limits (100,000 total components and 200,000 requests per day), the instance will cease to function properly.
+
+**If you have already upgraded to version 3.81, please follow this guide to downgrade to version 3.76.**
+
+For more information about Community Edition limitations, see [Community Edition Limitations](https://help.sonatype.com/en/ce-onboarding.html#community-edition-limitations).
+
+:::
+
+## Backup Nexus 3.81 Data
+
+Follow the [How to backup and restore nexus with Nexus](./03_backup_and_restore_with_nexus.mdx#backup) section to back up your data.
+
+## Deploy Nexus 3.76.z Instance
+
+When deploying the Nexus 3.76.z instance, ensure to specify the version and configure storage, nodePort, and admin account as needed. Refer to [Nexus Instance Deployment](https://docs.alauda.io/alauda-build-of-nexus/3.76/install/03_nexus_deploy.html#nexus-instance-deployment) for detailed instructions.
+
+## Rollback Database \{#rollback-database}
+
+Download the H2 database JAR file:
+
+```bash
+wget https://repo1.maven.org/maven2/com/h2database/h2/2.2.224/h2-2.2.224.jar -O h2.jar
+```
+
+Extract the H2 database backup file:
+```bash
+unzip nexus-backup/restore-from-backup/nexus-*.zip -d /tmp/nexus-restore
+```
+
+Execute the script to rollback the database to version 2.10 (corresponding to Nexus 3.76):
+
+```bash
+cat > rollback_db_to_3.76.sh << 'EOF'
+#!/bin/bash
+# Automatically rollback Nexus H2 database to flyway_schema_history version 2.10 (no confirmation required)
+
+# Usage: ./rollback_db_to_3.76.sh <db_path> <h2_jar_path>
+# Example: ./rollback_db_to_3.76.sh ./nexus ./h2.jar
+
+set -e
+
+# Check if required arguments are provided
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 <db_path> <h2_jar_path>"
+    echo "Example: $0 ./nexus ./h2.jar"
+    echo ""
+    echo "Arguments:"
+    echo "  db_path      - Path to H2 database (without .mv.db extension)"
+    echo "  h2_jar_path  - Path to H2 JAR file"
+    exit 1
+fi
+
+DB_PATH="$1"
+H2_JAR="$2"
+
+# Validate H2 JAR exists
+if [ ! -f "$H2_JAR" ]; then
+    echo "Error: H2 JAR file not found: $H2_JAR"
+    exit 1
+fi
+
+# Validate database file exists
+if [ ! -f "${DB_PATH}.mv.db" ]; then
+    echo "Error: Database file not found: ${DB_PATH}.mv.db"
+    exit 1
+fi
+
+echo "================================"
+echo "Starting rollback to version 2.10"
+echo "================================"
+echo "Database: ${DB_PATH}.mv.db"
+echo "H2 JAR: $H2_JAR"
+echo ""
+
+# Create backup of the database file
+cp "${DB_PATH}.mv.db" "${DB_PATH}.mv.db.backup-$(date +%Y%m%d%H%M%S)"
+echo "Backup created: ${DB_PATH}.mv.db.backup-*"
+
+# 1. Check current version
+echo "Current version:"
+java -cp "$H2_JAR" org.h2.tools.Shell -url "jdbc:h2:$DB_PATH" -user "" -password "" -sql 'SELECT "version", "description" FROM "flyway_schema_history" WHERE "version" IS NOT NULL ORDER BY "installed_rank" DESC LIMIT 1;'
+
+# 2. Count records to be deleted
+echo ""
+echo "Migration records to be deleted (installed_rank > 49):"
+RECORDS_COUNT=$(java -cp "$H2_JAR" org.h2.tools.Shell -url "jdbc:h2:$DB_PATH" -user "" -password "" -sql 'SELECT COUNT(*) FROM "flyway_schema_history" WHERE "installed_rank" > 49;' | grep -E "^[0-9]+$" | head -1)
+echo "Total records to delete: $RECORDS_COUNT"
+
+# 3. Display records to be deleted
+echo ""
+echo "Detailed records:"
+java -cp "$H2_JAR" org.h2.tools.Shell -url "jdbc:h2:$DB_PATH" -user "" -password "" -sql 'SELECT "installed_rank", "version", "description" FROM "flyway_schema_history" WHERE "installed_rank" > 49 ORDER BY "installed_rank" ASC;'
+
+# 4. Execute deletion
+echo ""
+echo "Deleting records..."
+java -cp "$H2_JAR" org.h2.tools.Shell -url "jdbc:h2:$DB_PATH" -user "" -password "" -sql 'DELETE FROM "flyway_schema_history" WHERE "installed_rank" > 49;'
+
+# 5. Verify results
+echo ""
+echo "================================"
+echo "Rollback completed!"
+echo "================================"
+echo ""
+echo "Current version:"
+java -cp "$H2_JAR" org.h2.tools.Shell -url "jdbc:h2:$DB_PATH" -user "" -password "" -sql 'SELECT "version", "description", "installed_on" FROM "flyway_schema_history" WHERE "version" IS NOT NULL ORDER BY "installed_rank" DESC LIMIT 1;'
+
+echo ""
+echo "Remaining migration records:"
+java -cp "$H2_JAR" org.h2.tools.Shell -url "jdbc:h2:$DB_PATH" -user "" -password "" -sql 'SELECT COUNT(*) as total_records FROM "flyway_schema_history";'
+
+echo ""
+echo "================================"
+echo "Important Notes:"
+echo "1. ✅ flyway_schema_history table has been rolled back to 2.10"
+echo "2. ⚠️  Please ensure to restore the rolled-back database file to your Nexus 3.76 instance."
+echo "================================"
+EOF
+
+chmod +x rollback_db_to_3.76.sh
+./rollback_db_to_3.76.sh /tmp/nexus-restore/nexus ./h2.jar
+mkdir -p /tmp/nexus-restore/rolledback
+cp /tmp/nexus-restore/nexus.mv.db /tmp/nexus-restore/rolledback/nexus.mv.db
+```
+
+## Restore Data to Nexus 3.76
+
+::: info Important
+When restoring data, ensure you use the rolled-back database file from the previous step: `/tmp/nexus-restore/rolledback/nexus.mv.db`.
+
+```bash
+kubectl -n <nexus-namespace> cp /tmp/nexus-restore/rolledback/nexus.mv.db <pod-name>:/nexus-data/db/nexus.mv.db
+```
+
+:::
+
+For complete restoration steps, refer to the [How to backup and restore nexus with Nexus](./03_backup_and_restore_with_nexus.mdx#restore) section.
+
+
+## Troubleshooting
+
+If an error occurs during the restoration process that prevents the new instance from starting, `completely clean up the new instance` and retry the restoration procedure from the beginning.

@@ -4,6 +4,16 @@ description: "This guide explains how to back up and restore your Nexus reposito
 weight: 130
 ---
 
+::: danger Deprecated: Nexus 3.81 (nexus-ce-operator v3.81.1 and v3.81.2)
+
+Due to restrictive limitations in Nexus 3.81 Community Edition, **this version has been discontinued**. Once usage reaches the quota limits (100,000 total components and 200,000 requests per day), the instance will cease to function properly.
+
+**If you have already upgraded to version 3.81, please follow the [Rollback to Nexus 3.76](./04_rollback_to_3.76.mdx) guide to downgrade.**
+
+For more information about Community Edition limitations, see [Community Edition Limitations](https://help.sonatype.com/en/ce-onboarding.html#community-edition-limitations).
+
+:::
+
 ## Prerequisites
 
 Uninstall the Nexus operator from the cluster.
@@ -32,14 +42,15 @@ Uninstalling the Operator will not cause existing instances to malfunction.
 
 :::
 
-## Backup
+## Backup \{#backup}
 
-Backup consists of four steps:
+Backup consists of five steps:
 
-1. Create a backup task on Nexus web.
-2. Remove the nexus instance service to prevent data changes
-3. Backup nexus data and verify the backup.
-4. Restore nexus instance after the backup end.
+1. Uninstall the Nexus operator from the cluster if not done already.
+2. Create a backup task on Nexus web.
+3. Remove the nexus instance service to prevent data changes
+4. Backup nexus data and verify the backup.
+5. Restore nexus instance after the backup end.
 
 ### Create a backup task on Nexus web.
 
@@ -174,7 +185,7 @@ nexus-backup
 
 Go to the `Administrator` -> `Marketplace` -> `Operator Hub` page, switch to the target cluster, and then redeploy the `Alauda Build of Nexus` Operator.
 
-## Restore
+## Restore \{#restore}
 
 ### Prerequisites
 
@@ -207,8 +218,8 @@ export POD_NAME=$(kubectl -n ${NEXUS_NAMESPACE} get pod ${NEXUS_NAME}-nxrm-ha-0 
 kubectl delete service -n $NEXUS_NAMESPACE -l release=$NEXUS_NAME
 
 # output:
-# service "kychen-nxrm-ha" deleted
-# service "kychen-nxrm-ha-hl" deleted
+# service "nexus-nxrm-ha" deleted
+# service "nexus-nxrm-ha-hl" deleted
 ```
 
 ### Remove existing data from the target instance
@@ -228,18 +239,30 @@ If you must delete on the node/PV directly, remove the same directories there.
 
 #### Import backup data
 
+::: info Important
+
+When restoring data, ensure you use the correct database file. 
+
+If rolling back to Nexus 3.76, use the rolled-back database file created in the previous step of the rollback process. See [Rollback to Nexus 3.76](./04_rollback_to_3.76.mdx#rollback-database) for details.
+
 ```bash
+kubectl -n $NEXUS_NAMESPACE cp /tmp/nexus-restore/rolledback/nexus.mv.db ${POD_NAME}:/nexus-data/db/nexus.mv.db
+```
+:::
+
+```bash
+kubectl -n $NEXUS_NAMESPACE exec -it ${POD_NAME} -- mkdir -p /nexus-data/db/
 kubectl -n $NEXUS_NAMESPACE cp nexus-backup/blobs ${POD_NAME}:/nexus-data
 kubectl -n $NEXUS_NAMESPACE cp nexus-backup/node ${POD_NAME}:/nexus-data/keystores
 unzip nexus-backup/restore-from-backup/nexus-*.zip -d /tmp/nexus-restore
-kubectl -n $NEXUS_NAMESPACE cp /tmp/nexus-restore ${POD_NAME}:/nexus-data/db
+kubectl -n $NEXUS_NAMESPACE cp /tmp/nexus-restore/nexus.mv.db ${POD_NAME}:/nexus-data/db/nexus.mv.db
 ```
 
 Verify the following directories in the pod contain data:
 
 - `/nexus-data/blobs`
 - `/nexus-data/keystores/node`
-- `/nexus-data/restore-from-backup`
+- `/nexus-data/db/nexus.mv.db`
 
 #### Restart pod to restore
 

@@ -1,5 +1,15 @@
 # Nexus Migration Guide: 3.69.0 to 3.76.0 (Alauda Build of Nexus Operator Version v3.76.z)
 
+::: danger Deprecated: Nexus 3.81 (nexus-ce-operator v3.81.1 and v3.81.2)
+
+Due to restrictive limitations in Nexus 3.81 Community Edition, **this version has been discontinued**. Once usage reaches the quota limits (100,000 total components and 200,000 requests per day), the instance will cease to function properly.
+
+**If you have already upgraded to version 3.81, please follow the [Rollback to Nexus 3.76](../howto/04_rollback_to_3.76.mdx) guide to downgrade.**
+
+For more information about Community Edition limitations, see [Community Edition Limitations](https://help.sonatype.com/en/ce-onboarding.html#community-edition-limitations).
+
+:::
+
 ## Overview
 
 This document provides detailed instructions for migrating Nexus Repository Manager from version 3.69.0 to 3.76.0. Due to Nexus discontinuing OrientDB support after version 3.70, a manual data migration process is required.
