@@ -6,13 +6,21 @@ weight: 200
 
 This document describes the subscription of Nexus Operator and the functionality for deploying Nexus instances.
 
-::: danger Namespace Security Policy Restrictions
+::: danger Pod Security Admission Level Restrictions
 
-Nexus **does not support** deployment in namespaces with SPA (Security Policy Admission) policy set to `Restricted` due to the following reasons:
+The Pod Security Admission (PSA) Level requirements for Nexus deployment depend on the storage method used:
 
-1. **Init Container Requires Root Privileges**: Nexus uses init containers to initialize PVC directory permissions, which requires root privileges that are not allowed under the Restricted policy.
+1. **HostPath Storage**: The PSA Level **must be configured as `Privileged`**, because `hostPath` volumes are not allowed under the `Restricted` policy.
 
-**Recommendation**: Create a dedicated namespace for the Nexus deployment and ensure that its security policy is **not** set to `Restricted`. When deploying Nexus with `hostPath` storage, the namespace security policy **must be configured as `Privileged`**.
+2. **PVC or StorageClass Storage**: Nexus **can be deployed** under the `Restricted` PSA level.
+
+PSA levels supported by each deployment template:
+
+| Deployment Template  | Supported PSA Levels             |
+| -------------------- | -------------------------------- |
+| Quick Start Template | Privileged                       |
+| Production Template  | Privileged, Baseline, Restricted |
+
 :::
 
 ## Prerequisites
@@ -95,7 +103,7 @@ spec:
       tls:
         - secretName: "test-tls-cert"
           hosts:
-          - test-ingress-https.example.com
+            - test-ingress-https.example.com
 ```
 
 Network configuration based on NodePort:
@@ -127,7 +135,7 @@ spec:
     pvc:
       volumeClaimTemplate:
         enabled: true
-      storage: 200Gi   ## Adjust according to actual requirements
+      storage: 200Gi ## Adjust according to actual requirements
 ```
 
 Storage configuration based on PVC:
