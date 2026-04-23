@@ -239,7 +239,7 @@ spec:
         port: {{ .Values.redisSecret.port }}
 ```
 
-### <span id ="internationalization">Configure Internationalization</span>
+### Configure Internationalization \{#internationalization}
 
 The template supports internationalization configuration. When displayed on the UI, the corresponding name and description will be displayed according to the language selected by the user.
 
@@ -266,7 +266,7 @@ metadata:
 ```
 
 
-### <span id ="dynamic_form">Configure Dynamic Form</span>
+### Configure Dynamic Form \{#dynamic_form}
 
 #### Control Types
 
@@ -411,7 +411,7 @@ x-descriptors:
   - urn:alm:descriptor:expression:props.options:value:path:metadata.name
 ```
 
-## <span id ="register_template">Register and Verify the Template</span>
+## Register and Verify the Template \{#register_template}
 
 - Register the custom template:
    - Create the template resource (`ConfigMap`) in the `cpaas-system` namespace of the target cluster to complete the registration.
