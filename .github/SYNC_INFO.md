@@ -1,10 +1,10 @@
 # Documentation Sync Information
 
-- **Last synced**: 2026-04-23 07:05:32 UTC
+- **Last synced**: 2026-07-15 07:29:26 UTC
 - **Source repository**: alaudadevops/nexus-ce-operator
-- **Source commit**: [ec5687e34573037bd558f6cc5995687264cf7deb](https://github.com/alaudadevops/nexus-ce-operator/commit/ec5687e34573037bd558f6cc5995687264cf7deb)
-- **Triggered by**: kycheng
-- **Workflow run**: [#48](https://github.com/alaudadevops/nexus-ce-operator/actions/runs/24821825548)
+- **Source commit**: [caaee563a387f8600a6d731eab8ee8989e3fbe05](https://github.com/alaudadevops/nexus-ce-operator/commit/caaee563a387f8600a6d731eab8ee8989e3fbe05)
+- **Triggered by**: chengjingtao
+- **Workflow run**: [#54](https://github.com/alaudadevops/nexus-ce-operator/actions/runs/29397509197)
 
 ## Files synced:
 - docs/
