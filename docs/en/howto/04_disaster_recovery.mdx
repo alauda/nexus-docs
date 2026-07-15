@@ -1,0 +1,31 @@
+---
+title: Disaster Recovery
+weight: 130
+---
+
+Nexus is a stateful service that stores your artifacts and repository data, so you must plan disaster recovery (DR) for it separately. Without a dedicated recovery plan, a disaster can lead to the loss of that data.
+
+This guide describes the disaster recovery options for Nexus and how they relate to the disaster recovery of the Alauda Container Platform (ACP) global cluster.
+
+## Disaster Recovery Options
+
+### Dedicated Disaster Recovery
+
+Nexus provides a dedicated disaster recovery solution that lets you recover the Nexus service in a secondary cluster after the primary cluster fails, with minimal data loss.
+
+For the architecture and detailed steps, refer to the Alauda Knowledge Base (KB).
+
+### Backup and Restore
+
+If you do not need the dedicated solution but want a recovery point to fall back to, use backup and restore. You periodically back up a Nexus instance and restore it when needed. This gives an approximate disaster recovery capability, with a longer recovery time than the dedicated solution.
+
+For details, see [Backup and Restore with Velero](./02_backup_and_restore_with_velero.mdx).
+
+## Relationship with ACP Global Cluster Disaster Recovery
+
+When Nexus is deployed on the ACP global cluster, the disaster recovery of the global cluster and Nexus's disaster recovery are two independent solutions. They do not depend on each other, and global cluster disaster recovery does **not** protect Nexus:
+
+- Global cluster disaster recovery does not synchronize Nexus resources, including Nexus instances, their workloads and data, and the dependent middleware.
+- Global cluster disaster recovery does not recover Nexus after a disaster.
+
+Therefore, even when Nexus runs on the ACP global cluster, you must still plan its disaster recovery separately using one of the options above.
