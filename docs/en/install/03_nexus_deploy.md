@@ -28,6 +28,47 @@ Nexus supports various resource configurations to accommodate different customer
 
 1. The Nexus Operator provided by the platform is based on the community's official Nexus Chart, with enhanced enterprise capabilities such as security vulnerability fixes. It is fully compatible with the community version in terms of functionality, and in terms of user experience, it enhances the convenience of Nexus deployment through optional, customizable templates and other methods.
 
+### Resource Planning \{#resource-planning}
+
+A Nexus instance runs as a single Pod with one Nexus container and three log containers. Plan the resources of the Nexus container. The log containers need few resources and can keep their default configuration (each container has a limit of 0.2 CPU cores and 512 Mi memory).
+
+For a production instance, set the resource limits of the Nexus container to at least:
+
+- CPU: 4 cores
+- Memory: 8 Gi
+
+Sonatype requires at least 8 GB of memory and a JVM heap of at least 2703 MB for Nexus Repository. For details, refer to [Sonatype Nexus Repository System Requirements](https://help.sonatype.com/en/sonatype-nexus-repository-system-requirements.html) and [Nexus Repository Memory Overview](https://help.sonatype.com/en/nexus-repository-memory-overview.html).
+
+#### JVM Memory Settings \{#jvm-memory-settings}
+
+The memory used by the Nexus container consists of the JVM heap, the JVM direct memory, and other JVM memory such as metaspace, thread stacks, and code cache. The total must stay below the memory limit of the container; otherwise, the container is terminated with `OOMKilled`.
+
+By default, the Nexus 3.76 image sets both the heap and the direct memory to 2703 MB (`-Xms2703m -Xmx2703m -XX:MaxDirectMemorySize=2703m`), about 5.3 GB in total. With a memory limit of 8 Gi, this leaves little memory for the rest of the JVM. Set the JVM memory explicitly so that the heap plus the direct memory does not exceed two-thirds of the memory limit, as Sonatype recommends.
+
+For a memory limit of 8 Gi, use a 3 GB heap and 2 GB of direct memory:
+
+```yaml
+spec:
+  helmValues:
+    statefulset:
+      container:
+        resources:
+          limits:
+            cpu: 4
+            memory: "8Gi"
+        env:
+          install4jAddVmParams: "-Xms3g -Xmx3g -XX:MaxDirectMemorySize=2g"
+```
+
+- Set `-Xms` and `-Xmx` to the same value.
+- If you increase the memory limit, increase the heap and the direct memory as well, and keep their sum within two-thirds of the memory limit.
+
+### Database and Supported Scale \{#database-and-supported-scale}
+
+The deployment described in this document uses the embedded H2 database. The H2 database and the file blob stores are both stored in the `/nexus-data` volume of the instance.
+
+According to Sonatype, Nexus Repository with the embedded H2 database supports up to 100,000 components or 200,000 requests per day. Workloads beyond these limits are not supported, and the instance may become unstable. Estimate the number of components and the daily request volume before deployment. For details, refer to [Sonatype Nexus Repository System Requirements](https://help.sonatype.com/en/sonatype-nexus-repository-system-requirements.html) and [Nexus Repository Database](https://help.sonatype.com/en/database-options.html).
+
 ## Instance Deployment
 
 ### Deploying from the `Quick Start Template`
@@ -44,7 +85,7 @@ Complete the deployment by filling in the relevant information according to the 
 
 This template is used to quickly create a Production Nexus instance, suitable for production scenarios, recommended for production environments.
 
-- Compute resources: 4 CPU cores, 8 Gi memory
+- Compute resources: The template presets resource requests and limits for the Nexus container. Before deployment, check the values in the template and make sure that the limits meet the requirements in [Resource Planning](#resource-planning) and that the JVM memory matches the memory limit, as described in [JVM Memory Settings](#jvm-memory-settings).
 - Storage: Use PVC storage, configure the storage class
 - Network access: Use Domain to access the service.
 
@@ -54,7 +95,7 @@ Complete the deployment by filling in the relevant information according to the 
 
 #### Resource Configuration
 
-Nexus is deployed using StatefulSet, containing 4 containers: 1 business container and 3 logging containers. When configuring resources, focus on the resources used by the business container, while the logging containers can be deployed with default configurations.
+Nexus is deployed using StatefulSet, containing 4 containers: 1 business container and 3 logging containers. When configuring resources, focus on the resources used by the business container, while the logging containers can be deployed with default configurations. Set the JVM memory according to the memory limit, as described in [JVM Memory Settings](#jvm-memory-settings).
 
 ```yaml
 spec:
@@ -68,9 +109,11 @@ spec:
           limits:
             cpu: 4
             memory: "8Gi"
+        env:
+          install4jAddVmParams: "-Xms3g -Xmx3g -XX:MaxDirectMemorySize=2g"
 ```
 
-For more information, refer to [Resource description in SonarQube Chart](https://github.com/sonatype/nxrm3-ha-repository/blob/76.0.0/nxrm-ha/values.yaml#L95)
+For more information, refer to [Resource description in Nexus Chart](https://github.com/sonatype/nxrm3-ha-repository/blob/76.0.0/nxrm-ha/values.yaml#L95)
 
 #### Network Configuration \{#network-configuration}
 
@@ -221,6 +264,7 @@ spec:
             memory: 8Gi
         env:
           zeroDowntimeEnabled: true
+          install4jAddVmParams: "-Xms3g -Xmx3g -XX:MaxDirectMemorySize=2g"
       nodeSelector:
         kubernetes.io/hostname: node1
     service:
