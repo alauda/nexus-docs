@@ -43,9 +43,9 @@ Sonatype requires at least 8 GB of memory and a JVM heap of at least 2703 MB for
 
 The memory used by the Nexus container consists of the JVM heap, the JVM direct memory, and other JVM memory such as metaspace, thread stacks, and code cache. The total must stay below the memory limit of the container; otherwise, the container is terminated with `OOMKilled`.
 
-By default, the Nexus 3.76 image sets both the heap and the direct memory to 2703 MB (`-Xms2703m -Xmx2703m -XX:MaxDirectMemorySize=2703m`), about 5.3 GB in total. With a memory limit of 8 Gi, this leaves little memory for the rest of the JVM. Set the JVM memory explicitly so that the heap plus the direct memory does not exceed two-thirds of the memory limit, as Sonatype recommends.
+By default, the chart sets the heap to 2703 MB (`install4jAddVmParams: "-Xms2703m -Xmx2703m"`). Because `-XX:MaxDirectMemorySize` is not set, the JVM allows as much direct memory as the heap, so the heap and the direct memory can reach about 5.3 GB in total. With a memory limit of 8 Gi, this is just within the two-thirds of the memory limit that Sonatype recommends for the heap plus the direct memory, which leaves little room for the rest of the JVM. When you set the JVM memory, keep the heap plus the direct memory within two-thirds of the memory limit.
 
-For a memory limit of 8 Gi, use a 3 GB heap and 2 GB of direct memory:
+For a memory limit of 8 Gi, you can use a 3 GB heap and 2 GB of direct memory. This gives the heap more memory than the default and sets an explicit cap on the direct memory, while the total stays within two-thirds of the limit:
 
 ```yaml
 spec:
@@ -85,7 +85,7 @@ Complete the deployment by filling in the relevant information according to the 
 
 This template is used to quickly create a Production Nexus instance, suitable for production scenarios, recommended for production environments.
 
-- Compute resources: The template presets resource requests and limits for the Nexus container. Before deployment, check the values in the template and make sure that the limits meet the requirements in [Resource Planning](#resource-planning) and that the JVM memory matches the memory limit, as described in [JVM Memory Settings](#jvm-memory-settings).
+- Compute resources: the template sets requests of 4 CPU cores and 8 Gi memory and limits of 6 CPU cores and 12 Gi memory for the Nexus container, and keeps the default JVM memory (2703 MB heap). These values meet the requirements in [Resource Planning](#resource-planning). If you change the memory limit, adjust the JVM memory as described in [JVM Memory Settings](#jvm-memory-settings).
 - Storage: Use PVC storage, configure the storage class
 - Network access: Use Domain to access the service.
 
